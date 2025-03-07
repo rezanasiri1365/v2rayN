@@ -79,6 +79,15 @@ namespace ServiceLib.Resx {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to 5000.
+        /// </summary>
+        public static string ApicheckDelay {
+            get {
+                return ResourceManager.GetString("ApicheckDelay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Api Comunication failed. please check the network or Connect with administrator..
         /// </summary>
         public static string ApiConnectionFailed {
@@ -2019,6 +2028,15 @@ namespace ServiceLib.Resx {
         public static string PleaseSelectServer {
             get {
                 return ResourceManager.GetString("PleaseSelectServer", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to 10000.
+        /// </summary>
+        public static string proxySpeedCheckDelay {
+            get {
+                return ResourceManager.GetString("proxySpeedCheckDelay", resourceCulture);
             }
         }
         

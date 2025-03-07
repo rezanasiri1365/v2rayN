@@ -1411,4 +1411,10 @@
   <data name="BaseApiMethod" xml:space="preserve">
     <value />
   </data>
+  <data name="ApicheckDelay" xml:space="preserve">
+    <value />
+  </data>
+  <data name="proxySpeedCheckDelay" xml:space="preserve">
+    <value />
+  </data>
 </root>

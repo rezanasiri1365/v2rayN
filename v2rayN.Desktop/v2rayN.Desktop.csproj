@@ -38,6 +38,15 @@
 		<EmbeddedResource Include="Assets\v2rayN.ico">
 			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</EmbeddedResource>
+		<Compile Update="Resx\setting.Designer.cs">
+		  <DesignTime>True</DesignTime>
+		  <AutoGen>True</AutoGen>
+		  <DependentUpon>setting.resx</DependentUpon>
+		</Compile>
+		<EmbeddedResource Update="Resx\setting.resx">
+		  <Generator>ResXFileCodeGenerator</Generator>
+		  <LastGenOutput>setting.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
 		<None Update="v2rayN.png">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>

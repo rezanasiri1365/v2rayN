@@ -530,7 +530,14 @@ namespace ServiceLib.ViewModels
                 
                 try
                 {
-                    Thread.Sleep(6 * 1000);
+                    var ApicheckDelay = 10000;
+                    var speedcheckDelay = 10000;
+                    
+                    if (!string.IsNullOrEmpty(ResUI.proxySpeedCheckDelay))
+                        ApicheckDelay = int.Parse(ResUI.proxySpeedCheckDelay);
+                    if (!string.IsNullOrEmpty(ResUI.ApicheckDelay))
+                        ApicheckDelay = int.Parse(ResUI.ApicheckDelay);
+                    Thread.Sleep(ApicheckDelay);
                     var prxData = GetProxyByApiSSL();
                     if (await checkTimertoDelete())
                     {
@@ -564,7 +571,8 @@ namespace ServiceLib.ViewModels
                         var SelProf =profVm?.GetProfileItemsExByindex(prfItem.Id).Result;
                         profVm?.ServerSpeedtestByselected(ESpeedActionType.Speedtest, SelProf);
                         _updateView?.Invoke(EViewAction.DispatcherSpeedTest, null);
-                        Thread.Sleep(10 * 1000);
+                        
+                        Thread.Sleep(speedcheckDelay);
                         GetSpeedAndPostToApi(SelProf.IndexId, prxData?.Result);
                         NoticeHandler.Instance.Enqueue(string.Format(ResUI.SuccessfullyImportedServerViaClipboard, ret));
                     }
