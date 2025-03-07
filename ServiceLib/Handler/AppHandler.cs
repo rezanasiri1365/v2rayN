@@ -1,4 +1,4 @@
-﻿namespace ServiceLib.Handler
+namespace ServiceLib.Handler
 {
     public sealed class AppHandler
     {
@@ -187,6 +187,10 @@
                 return null;
             }
             return await SQLiteHelper.Instance.TableAsync<ProfileItem>().FirstOrDefaultAsync(it => it.IndexId == indexId);
+        }
+        public async Task<List<ProfileItem?>> GetAllProfileItem()
+        {
+            return await SQLiteHelper.Instance.TableAsync<ProfileItem>().ToListAsync();
         }
 
         public async Task<ProfileItem?> GetProfileItemViaRemarks(string? remarks)

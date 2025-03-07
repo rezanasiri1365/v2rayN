@@ -1,11 +1,14 @@
+using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 using Splat;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace ServiceLib.ViewModels
 {
@@ -21,7 +24,7 @@ namespace ServiceLib.ViewModels
 
         #region ObservableCollection
 
-        private IObservableCollection<ProfileItemModel> _profileItems = new ObservableCollectionExtended<ProfileItemModel>();
+        public IObservableCollection<ProfileItemModel> _profileItems = new ObservableCollectionExtended<ProfileItemModel>();
         public IObservableCollection<ProfileItemModel> ProfileItems => _profileItems;
 
         private IObservableCollection<SubItem> _subItems = new ObservableCollectionExtended<SubItem>();
@@ -259,7 +262,7 @@ namespace ServiceLib.ViewModels
             Locator.Current.GetService<MainWindowViewModel>()?.Reload();
         }
 
-        private void UpdateSpeedtestHandler(SpeedTestResult result)
+        public void UpdateSpeedtestHandler(SpeedTestResult result)
         {
             _updateView?.Invoke(EViewAction.DispatcherSpeedTest, result);
         }
@@ -360,6 +363,7 @@ namespace ServiceLib.ViewModels
 
         public async Task RefreshServersBiz()
         {
+            
             var lstModel = await GetProfileItemsEx(_config.SubIndexId, _serverFilter);
             _lstProfile = JsonUtils.Deserialize<List<ProfileItem>>(JsonUtils.Serialize(lstModel)) ?? [];
 
@@ -399,7 +403,7 @@ namespace ServiceLib.ViewModels
             }
         }
 
-        private async Task<List<ProfileItemModel>?> GetProfileItemsEx(string subid, string filter)
+        public async Task<List<ProfileItemModel>?> GetProfileItemsEx(string subid="", string filter="")
         {
             var lstModel = await AppHandler.Instance.ProfileItems(_config.SubIndexId, filter);
 
@@ -432,17 +436,60 @@ namespace ServiceLib.ViewModels
                             TodayDown = t22 == null ? "" : Utils.HumanFy(t22.TodayDown),
                             TodayUp = t22 == null ? "" : Utils.HumanFy(t22.TodayUp),
                             TotalDown = t22 == null ? "" : Utils.HumanFy(t22.TotalDown),
-                            TotalUp = t22 == null ? "" : Utils.HumanFy(t22.TotalUp)
+                            TotalUp = t22 == null ? "" : Utils.HumanFy(t22.TotalUp),
+                            DateNow= t22 == null ? 0 : t22.DateNow
                         }).OrderBy(t => t.Sort).ToList();
 
             return lstModel;
+        }
+        public async Task<ProfileItemModel> GetProfileItemsExByindex(string SelectedindexId)
+        {
+            if (SelectedindexId == "")
+                return null;
+            var lstModel = await AppHandler.Instance.ProfileItems("", "");
+
+            await ConfigHandler.SetDefaultServer(_config, lstModel);
+
+            var lstServerStat = (_config.GuiItem.EnableStatistics ? StatisticsHandler.Instance.ServerStat : null) ?? [];
+            var lstProfileExs = await ProfileExHandler.Instance.GetProfileExs();
+            lstModel = (from t in lstModel
+                        join t2 in lstServerStat on t.IndexId equals t2.IndexId into t2b
+                        from t22 in t2b.DefaultIfEmpty()
+                        join t3 in lstProfileExs on t.IndexId equals t3.IndexId into t3b
+                        from t33 in t3b.DefaultIfEmpty()
+                        select new ProfileItemModel
+                        {
+                            Id=t.Id,
+                            IndexId = t.IndexId,
+                            ConfigType = t.ConfigType,
+                            Remarks = t.Remarks,
+                            Address = t.Address,
+                            Port = t.Port,
+                            Security = t.Security,
+                            Network = t.Network,
+                            StreamSecurity = t.StreamSecurity,
+                            Subid = t.Subid,
+                            SubRemarks = t.SubRemarks,
+                            IsActive = t.IndexId == _config.IndexId,
+                            Sort = t33 == null ? 0 : t33.Sort,
+                            Delay = t33 == null ? 0 : t33.Delay,
+                            DelayVal = t33?.Delay != 0 ? $"{t33?.Delay} {Global.DelayUnit}" : string.Empty,
+                            SpeedVal = t33?.Speed != 0 ? $"{t33?.Speed} {Global.SpeedUnit}" : string.Empty,
+                            TodayDown = t22 == null ? "" : Utils.HumanFy(t22.TodayDown),
+                            TodayUp = t22 == null ? "" : Utils.HumanFy(t22.TodayUp),
+                            TotalDown = t22 == null ? "" : Utils.HumanFy(t22.TotalDown),
+                            TotalUp = t22 == null ? "" : Utils.HumanFy(t22.TotalUp),
+                            DateNow = t22 == null ? 0 : t22.DateNow
+                        }).OrderBy(t => t.Sort).ToList();
+            lstModel=lstModel.Where(st=> st.Id==SelectedindexId).OrderBy(t => t.Sort).ToList();
+            return (ProfileItemModel)lstModel.FirstOrDefault();
         }
 
         #endregion Servers && Groups
 
         #region Add Servers
 
-        private async Task<List<ProfileItem>?> GetProfileItems(bool latest)
+        public async Task<List<ProfileItem>?> GetProfileItems(bool latest)
         {
             var lstSelecteds = new List<ProfileItem>();
             if (SelectedProfiles == null || SelectedProfiles.Count <= 0)
@@ -467,6 +514,29 @@ namespace ServiceLib.ViewModels
                 lstSelecteds = JsonUtils.Deserialize<List<ProfileItem>>(JsonUtils.Serialize(orderProfiles));
             }
 
+            return lstSelecteds;
+        }
+        /// <summary>
+        /// get profile of itemby index id
+        /// </summary>
+        /// <param name="latest"></param>
+        /// <returns></returns>
+        public async Task<List<ProfileItem>?> GetProfileItemsBySelected(ProfileItemModel newprfItem)
+        {
+            var lstSelecteds = new List<ProfileItem>();
+            if (newprfItem == null)
+                return null;
+            var item = await AppHandler.Instance.GetProfileItem(newprfItem.IndexId);
+            if (item is not null)
+            {
+                lstSelecteds.Add(item);
+            }
+
+            return lstSelecteds;
+        }
+        public async Task<List<ProfileItem>?> GetAllProfileItems()
+        {
+            var lstSelecteds  = await AppHandler.Instance.GetAllProfileItem();
             return lstSelecteds;
         }
 
@@ -502,7 +572,33 @@ namespace ServiceLib.ViewModels
                 }
             }
         }
+        public async Task RemoveServersAsync()
+        {
+            var lstSelecteds = await GetAllProfileItems();
+            if (lstSelecteds == null)
+            {
+                return;
+            }
+            //if (await _updateView?.Invoke(EViewAction.ShowYesNo, null) == false)
+            //{
+            //    return;
+            //}
+            //var exists = lstSelecteds.Exists(t => t.IndexId == _config.IndexId);
 
+            await ConfigHandler.RemoveServer(_config, lstSelecteds);
+            NoticeHandler.Instance.Enqueue(ResUI.RemoveTimelyAutomated);
+            if (lstSelecteds.Count == _profileItems.Count)
+            {
+                _profileItems.Clear();
+            }
+            RefreshServers();
+            Reload();
+
+            //if (exists)
+            //{
+            //    Reload();
+            //}
+        }
         public async Task RemoveServerAsync()
         {
             var lstSelecteds = await GetProfileItems(true);
@@ -529,12 +625,22 @@ namespace ServiceLib.ViewModels
             }
         }
 
-        private async Task RemoveDuplicateServer()
+        public async Task RemoveDuplicateServer()
         {
             var tuple = await ConfigHandler.DedupServerList(_config, _config.SubIndexId);
+            //if (!await isDuplicateServer())
+            //    return;
             RefreshServers();
             Reload();
             NoticeHandler.Instance.Enqueue(string.Format(ResUI.RemoveDuplicateServerResult, tuple.Item1, tuple.Item2));
+        }
+        public async Task<bool> isDuplicateServer()
+        {
+            var tuple = await ConfigHandler.DedupServerList(_config, _config.SubIndexId);
+            if (tuple == null | tuple?.Item1 <2)
+                return false;
+            else
+                return true;
         }
 
         private async Task CopyServer()
@@ -721,6 +827,7 @@ namespace ServiceLib.ViewModels
             {
                 SelectedProfiles = _profileItems;
             }
+
             var lstSelecteds = await GetProfileItems(false);
             if (lstSelecteds == null)
             {
@@ -730,7 +837,27 @@ namespace ServiceLib.ViewModels
 
             _ = new SpeedtestService(_config, lstSelecteds, actionType, UpdateSpeedtestHandler);
         }
+        /// <summary>
+        /// get speed by send profile item
+        /// </summary>
+        /// <param name="actionType"></param>
+        /// <param name="NewPrfItem"></param>
+        /// <returns></returns>
+        public async Task ServerSpeedtestByselected(ESpeedActionType actionType, ProfileItemModel NewPrfItem)
+        {
 
+            ////var prfitem = GetProfileItemsExByindex(id);
+            ////SelectedProfiles = prfitem.Result;
+            ////var lstSelecteds = await GetProfileItems(false);
+            var lstSelecteds = await GetProfileItemsBySelected(NewPrfItem);
+            if (lstSelecteds == null)
+            {
+                return;
+            }
+            //ClearTestResult();
+
+            _ = new SpeedtestService(_config, lstSelecteds, actionType, UpdateSpeedtestHandler);
+        }
         public void ServerSpeedtestStop()
         {
             MessageBus.Current.SendMessage("", EMsgCommand.StopSpeedtest.ToString());

@@ -1,4 +1,4 @@
-﻿namespace ServiceLib.Models
+namespace ServiceLib.Models
 {
     [Serializable]
     public class ProfileItemModel : ProfileItem
@@ -14,5 +14,7 @@
         public string TodayDown { get; set; }
         public string TotalUp { get; set; }
         public string TotalDown { get; set; }
+        public long DateNow { get; set; }
+        
     }
 }

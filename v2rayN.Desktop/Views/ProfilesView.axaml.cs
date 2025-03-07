@@ -118,9 +118,7 @@ namespace v2rayN.Desktop.Views
                     break;
 
                 case EViewAction.AdjustMainLvColWidth:
-                    Dispatcher.UIThread.Post(() =>
-                         AutofitColumnWidth(),
-                   DispatcherPriority.Default);
+                    Dispatcher.UIThread.Post(() =>AutofitColumnWidth(),DispatcherPriority.Default);
 
                     break;
 
@@ -170,17 +168,18 @@ namespace v2rayN.Desktop.Views
                 case EViewAction.DispatcherSpeedTest:
                     if (obj is null)
                         return false;
-                    Dispatcher.UIThread.Post(() =>
-                        ViewModel?.SetSpeedTestResult((SpeedTestResult)obj),
-                    DispatcherPriority.Default);
+                    Dispatcher.UIThread.Post(() =>ViewModel?.SetSpeedTestResult((SpeedTestResult)obj),DispatcherPriority.Default);
 
                     break;
 
                 case EViewAction.DispatcherRefreshServersBiz:
-                    Dispatcher.UIThread.Post(() =>
-                        ViewModel?.RefreshServersBiz(),
-                    DispatcherPriority.Default);
+                    Dispatcher.UIThread.Post(() =>ViewModel?.RefreshServersBiz(),DispatcherPriority.Default);
                     break;
+
+                case EViewAction.RemoveAllprofile:
+                    Dispatcher.UIThread.Post(() =>ViewModel?.RemoveServersAsync(),DispatcherPriority.Default);
+                    break;
+
             }
 
             return await Task.FromResult(true);

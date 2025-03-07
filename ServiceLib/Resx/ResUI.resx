@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -494,7 +494,7 @@
     <value>Clone selected server</value>
   </data>
   <data name="menuRemoveDuplicateServer" xml:space="preserve">
-    <value>Remove duplicate servers</value>
+    <value>New Recieved  proxy is Exist and repetitive</value>
   </data>
   <data name="menuRemoveServer" xml:space="preserve">
     <value>Remove selected servers (Delete)</value>
@@ -1392,5 +1392,26 @@
   </data>
   <data name="menuCopyProxyCmdToClipboard" xml:space="preserve">
     <value>Copy proxy command to clipboard</value>
+  </data>
+  <data name="ApiConnectionFailed" xml:space="preserve">
+    <value>Api Comunication failed. please check the network or Connect with administrator.</value>
+  </data>
+  <data name="ApiproxyNull" xml:space="preserve">
+    <value>Proxy recieved from Api but it not in correct format or it is Null.</value>
+  </data>
+  <data name="ApiResponseSuccess" xml:space="preserve">
+    <value>Reponse Send To Api Successfully</value>
+  </data>
+  <data name="RemoveTimelyAutomated" xml:space="preserve">
+    <value>Remove All Proxy At time Autmatically Successfully done</value>
+  </data>
+  <data name="BaseApiUrl" xml:space="preserve">
+    <value>http://localhost:5249/</value>
+  </data>
+  <data name="String1" xml:space="preserve">
+    <value>api/WebApiProxyProvider</value>
+  </data>
+  <data name="BaseApiMethod" xml:space="preserve">
+    <value>api/WebApiProxyProvider</value>
   </data>
 </root>

@@ -8,19 +8,9 @@
     xmlns:resx="clr-namespace:ServiceLib.Resx;assembly=ServiceLib"
     xmlns:view="using:v2rayN.Desktop.Views"
     xmlns:vms="clr-namespace:ServiceLib.ViewModels;assembly=ServiceLib"
-    Title="v2rayN"
-    Width="900"
-    Height="600"
-    MinWidth="900"
-    x:DataType="vms:MainWindowViewModel"
-    Icon="/Assets/NotifyIcon1.ico"
-    ShowInTaskbar="True"
-    WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
-    <dialogHost:DialogHost
-        Background="Gray"
-        CloseOnClickAway="True"
-        DisableOpeningAnimation="True">
+    Title="v2rayN" Width="900" Height="600" MinWidth="900" x:DataType="vms:MainWindowViewModel" Icon="/Assets/NotifyIcon1.ico"
+    ShowInTaskbar="True" WindowStartupLocation="CenterScreen" mc:Ignorable="d">
+    <dialogHost:DialogHost Background="Gray" CloseOnClickAway="True" DisableOpeningAnimation="True">
         <DockPanel>
             <DockPanel Classes="Margin8" DockPanel.Dock="Top">
                 <ContentControl x:Name="conTheme" DockPanel.Dock="Right" />
@@ -125,31 +115,19 @@
             <view:StatusBarView DockPanel.Dock="Bottom" />
 
             <Grid>
-                <Grid
-                    x:Name="gridMain"
-                    ColumnDefinitions="1*,10,1*"
-                    IsVisible="False">
+                <Grid x:Name="gridMain" ColumnDefinitions="1*,10,1*" IsVisible="False">
                     <ContentControl x:Name="tabProfiles" Grid.Column="0" />
                     <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" />
-                    <TabControl
-                        x:Name="tabMain"
-                        Grid.Column="2"
-                        HorizontalContentAlignment="Left">
+                    <TabControl x:Name="tabMain" Grid.Column="2" HorizontalContentAlignment="Left">
                         <TabItem x:Name="tabMsgView" Header="{x:Static resx:ResUI.MsgInformationTitle}" />
                         <TabItem x:Name="tabClashProxies" Header="{x:Static resx:ResUI.TbProxies}" />
                         <TabItem x:Name="tabClashConnections" Header="{x:Static resx:ResUI.TbConnections}" />
                     </TabControl>
                 </Grid>
-                <Grid
-                    x:Name="gridMain1"
-                    IsVisible="False"
-                    RowDefinitions="1*,10,1*">
+                <Grid x:Name="gridMain1" IsVisible="False" RowDefinitions="1*,10,1*">
                     <ContentControl x:Name="tabProfiles1" Grid.Row="0" />
                     <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" />
-                    <TabControl
-                        x:Name="tabMain1"
-                        Grid.Row="2"
-                        TabStripPlacement="Left">
+                    <TabControl x:Name="tabMain1" Grid.Row="2" TabStripPlacement="Left">
                         <TabItem x:Name="tabMsgView1" Header="{x:Static resx:ResUI.MsgInformationTitle}" />
                         <TabItem x:Name="tabClashProxies1" Header="{x:Static resx:ResUI.TbProxies}" />
                         <TabItem x:Name="tabClashConnections1" Header="{x:Static resx:ResUI.TbConnections}" />

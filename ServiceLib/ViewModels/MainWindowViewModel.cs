@@ -6,6 +6,10 @@ using System.Net.Http;
 using Newtonsoft.Json;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Http.Headers;
+using static QRCoder.PayloadGenerator;
+using System.Text;
+using ServiceLib.Models;
+using DynamicData.Binding;
 
 namespace ServiceLib.ViewModels
 {
@@ -67,6 +71,7 @@ namespace ServiceLib.ViewModels
 
         #endregion Menu
         private static HttpClient _httpclient = new HttpClient();
+        private static string _Basehttpurl = "http://localhost:5249/api/WebApiProxyProvider";
         private bool _hasNextReloadJob = false;
 
         #region Init
@@ -75,7 +80,7 @@ namespace ServiceLib.ViewModels
         {
             _config = AppHandler.Instance.Config;
             _updateView = updateView;
-
+                
             #region WhenAnyValue && ReactiveCommand
 
             //servers
@@ -232,6 +237,9 @@ namespace ServiceLib.ViewModels
             BlReloadEnabled = true;
             await Reload();
             await AutoHideStartup();
+            Task.Factory.StartNew(AddServerViaRestApiAsync, TaskCreationOptions.LongRunning);
+
+            //Task.Factory.StartNew(checkTimertoDelete, TaskCreationOptions.LongRunning);
             Locator.Current.GetService<StatusBarViewModel>()?.RefreshRoutingsMenu();
         }
 
@@ -347,10 +355,28 @@ namespace ServiceLib.ViewModels
         {
             MessageBus.Current.SendMessage("", EMsgCommand.RefreshProfiles.ToString());
         }
-
+        /// <summary>
+        /// Using Locator to run Refreshb subscriptions at profileviewmodel
+        /// </summary>
         private void RefreshSubscriptions()
         {
             Locator.Current.GetService<ProfilesViewModel>()?.RefreshSubscriptions();
+        }
+        private async Task<bool> RefreshSubscriptionsAndRemoveDuplicate()
+        {
+            var profVM = Locator.Current.GetService<ProfilesViewModel>();
+            //Locator.Current.GetService<ProfilesViewModel>()?.RefreshSubscriptions();
+            if (await profVM?.isDuplicateServer())
+            {
+                profVM?.RemoveDuplicateServer();
+                profVM?.RefreshSubscriptions();
+                return true;
+            }
+            else
+            {
+                profVM?.RefreshSubscriptions();
+                return false;
+            }
         }
 
         #endregion Servers && Groups
@@ -384,12 +410,17 @@ namespace ServiceLib.ViewModels
                 }
             }
         }
+        /// <summary>
+        /// the function connect to rest api and could get new proxy by SSL Validation in Api side 
+        /// </summary>
+        /// <returns></returns>
         public async Task<string> GetProxyByApiSSL()
         {
             try
             {
-                string httpurl = "http://localhost:5249/";
-                string httpsurl = "https://localhost:7249/";
+                //string httpurl = "http://localhost:5249/";
+                string httpurl = ResUI.BaseApiUrl;
+
                 HttpClientHandler handler = new HttpClientHandler();
                 //handler.ClientCertificateOptions = ClientCertificateOption.Manual;
                 //handler.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
@@ -400,7 +431,8 @@ namespace ServiceLib.ViewModels
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 client.Timeout = TimeSpan.FromSeconds(15);
 
-                var response = await client.GetAsync("api/WebApiProxyProvider").ConfigureAwait(false);
+                //var response = await client.GetAsync("api/WebApiProxyProvider").ConfigureAwait(false);
+                var response = await client.GetAsync(ResUI.BaseApiMethod).ConfigureAwait(false);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var content = await response.Content.ReadAsStringAsync();
@@ -418,15 +450,19 @@ namespace ServiceLib.ViewModels
             }
             
         }
+        /// <summary>
+        /// GetProxy by rest Api 
+        /// </summary>
+        /// <returns></returns>
         public async Task<string> GetProxyByApiNoneSSL()
         {
             try
             {
-                string httpurl = "http://localhost:5249/api/WebApiProxyProvider";
+                
                 //HttpClientHandler handler = new HttpClientHandler();
                 //handler.ClientCertificates.Add(clientCert);
                 //HttpClient client = new HttpClient(handler);
-                var response = await _httpclient.GetAsync(httpurl);
+                var response = await _httpclient.GetAsync(ResUI.BaseApiUrl+ ResUI.BaseApiMethod);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
                     var content = await response.Content.ReadAsStringAsync();
@@ -439,42 +475,200 @@ namespace ServiceLib.ViewModels
             }
             catch (Exception ex)
             {
+                return null;
+            }
+
+        }
+        /// <summary>
+        /// notify to api by model as  ProxyModelTosendApi with content and speed that show the result of proxy 
+        /// </summary>
+        /// <param name="prxmodel"></param>
+        /// <returns></returns>
+        public async Task PostProxyByApiNoneSSL(ProxyModelTosendApi prxmodel)
+        {
+            try
+            {
+                //string PostUrl = $"{_Basehttpurl}?ReturnedProxy={strproxy}&speed={ProxySpeed}";
+                //var prxmodel = new ProxyModelTosendApi() { Content= "Lorem", Description = "Ipsum" };
+                if (prxmodel == null)
+                    return;
+                var jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(prxmodel);
+                var requestContent = new StringContent(jsonData, Encoding.Unicode, "application/json");
+                var response = await _httpclient.PostAsync(ResUI.BaseApiUrl+ResUI.BaseApiMethod, requestContent);
+                if (response.StatusCode == System.Net.HttpStatusCode.OK | response.StatusCode == System.Net.HttpStatusCode.Accepted)
+                {
+                    ////var content = await response.Result.Content.ReadAsStringAsync();
+                    ////var createdCategory = JsonConvert.DeserializeObject<bool>(content);
+                    NoticeHandler.Instance.Enqueue(ResUI.ApiResponseSuccess);
+                }
+            }
+            catch (Exception)
+            {
 
                 throw;
             }
-
         }
+        /// <summary>
+        /// Create Task for stating Syncronization via Rest Api.
+        /// </summary>
         public async void AddServerViaRestApiAsyncTask()
         {
             Task.Factory.StartNew(AddServerViaRestApiAsync, TaskCreationOptions.LongRunning);
+            //Task.Factory.StartNew(checkTimertoDelete, TaskCreationOptions.LongRunning);
         }
+        /// <summary>
+        /// the main Tast to Add new proxy via rest api , the first check Proxy from server by GetProxyByApiSSL() and then Check the timer that if time :00:00:00
+        /// checkTimertoDelete() must delete all proxy from that we recieved , then if proxy is not null and via AddBatchServers() check the proxy is exist in database
+        /// or no , after the steps the proxy could insert to server and then test the speed by ServerSpeedtest(), by calling PostProxyByApiNoneSSL() we could send proxy string and
+        /// also proxy speed to api server
+        /// Modified By Nasiri
+        /// </summary>
         public async void AddServerViaRestApiAsync()
         {
-           while(true)
+            while (true)
             {
-                var prxData = GetProxyByApiSSL().Result;
-                if (prxData == null || prxData == "")
+                
+                try
                 {
-                    await _updateView?.Invoke(EViewAction.AddServerViaClipboard, null);
-                    return;
+                    Thread.Sleep(6 * 1000);
+                    var prxData = GetProxyByApiSSL();
+                    if (await checkTimertoDelete())
+                    {
+                        continue;
+                    }
+                    if (prxData == null | prxData?.Result == null  )
+                    {
+                        //await _updateView?.Invoke(EViewAction.AddServerViaClipboard, null);
+                        ///Send Notice to UI
+                        NoticeHandler.Instance.Enqueue(ResUI.ApiConnectionFailed);
+                        continue;
+                    }
+                    if (prxData?.Result == "")
+                    {
+                        //await _updateView?.Invoke(EViewAction.AddServerViaClipboard, null);
+                        NoticeHandler.Instance.Enqueue(ResUI.ApiproxyNull);
+                        
+                        continue;
+                    }
+                   
+                    int ret = await ConfigHandler.AddBatchServers(_config, prxData?.Result, _config.SubIndexId, false);
+                    if (ret > 0)
+                    {
+                        RefreshSubscriptions();
+                        ////var isduplimported=await RefreshSubscriptionsAndRemoveDuplicate();
+                        RefreshServers();
+                        var profVm = Locator.Current.GetService<ProfilesViewModel>();
+                        var prfItem = FmtHandler.ResolveConfig(prxData?.Result, out string msg);
+                        ////ServerSpeedtest(ESpeedActionType.Speedtest,_config.IndexId);
+                        /// profVm?.SelectedProfiles =  profVm?.GetProfileItemsExByindex(_config.IndexId).Result;
+                        var SelProf =profVm?.GetProfileItemsExByindex(prfItem.Id).Result;
+                        profVm?.ServerSpeedtestByselected(ESpeedActionType.Speedtest, SelProf);
+                        _updateView?.Invoke(EViewAction.DispatcherSpeedTest, null);
+                        Thread.Sleep(10 * 1000);
+                        GetSpeedAndPostToApi(SelProf.IndexId, prxData?.Result);
+                        NoticeHandler.Instance.Enqueue(string.Format(ResUI.SuccessfullyImportedServerViaClipboard, ret));
+                    }
+                    else
+                    {
+                        if (ret == 0)
+                            NoticeHandler.Instance.Enqueue(ResUI.menuRemoveDuplicateServer);
+                        else
+                            NoticeHandler.Instance.Enqueue(ResUI.OperationFailed);
+                    }
+                    
                 }
-                int ret = await ConfigHandler.AddBatchServers(_config, prxData, _config.SubIndexId, false);
-                if (ret > 0)
+                catch (System.AggregateException ex)
                 {
-                    RefreshSubscriptions();
-                    RefreshServers();
-                    NoticeHandler.Instance.Enqueue(string.Format(ResUI.SuccessfullyImportedServerViaClipboard, ret));
+                    NoticeHandler.Instance.Enqueue(ex.Message);
+                    Logging.SaveLog("OnApiConnection -> " + ex.Message.ToString());
+
                 }
-                else
-                {
-                    NoticeHandler.Instance.Enqueue(ResUI.OperationFailed);
-                }
-                Thread.Sleep(6 * 1000);
+            }
+        }
+        /// <summary>
+        /// after some delay toupdating the speed of each proxy the method could update the proxy and send it to api
+        /// </summary>
+        /// <param name="newPrxindex"></param>
+        /// <param name="proxystr"></param>
+        /// <returns></returns>
+        public async Task GetSpeedAndPostToApi(string newPrxindex,string proxystr)
+        {
+            try
+            {
+                var profVm = Locator.Current.GetService<ProfilesViewModel>();
+                var profitemEX = await profVm.GetProfileItemsEx();
+                var specProfid = profitemEX.Where(st => st.IndexId == newPrxindex).FirstOrDefault();
+                string speedValue = "0";
+                if (specProfid != null)
+                    speedValue = (specProfid.SpeedVal == null) ? "0" : specProfid.SpeedVal;
+                PostProxyByApiNoneSSL(new ProxyModelTosendApi() { Content = $"{proxystr}", Speed = speedValue });
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+        }
+        /// <summary>
+        /// the function are check the time and at zero time remove all proxies 
+        /// </summary>
+        /// <returns></returns>
+        public async Task<bool> checkTimertoDelete()
+        {
+            if (DateTime.Now.TimeOfDay == TimeSpan.Zero)
+            {
+                //var profVm = Locator.Current.GetService<ProfilesViewModel>();
+                //await profVm?.RemoveServersAsync();
+                _updateView?.Invoke(EViewAction.RemoveAllprofile, null);
+                PostProxyByApiNoneSSL(new ProxyModelTosendApi() { Content = $"", Speed ="0" });
+                return true;
+            }
+            else
+            {
+                //var profVm = Locator.Current.GetService<ProfilesViewModel>();
+                //await profVm?.RemoveServersAsync();
+                //_updateView?.Invoke(EViewAction.RemoveAllprofile, null);
+                //PostProxyByApiNoneSSL(new ProxyModelTosendApi() { Content = $"", Speed = double.Parse("0") });
+                return false;
             }
                 
-            
         }
+        /// <summary>
+        /// The function use Profile view to test speed of  each proxy 
+        /// </summary>
+        /// <param name="actionType"></param>
+        /// <returns></returns>
+        public async Task ServerSpeedtest(ESpeedActionType actionType)
+        {
+            var profVm = Locator.Current.GetService<ProfilesViewModel>();
+           //// await profVm ?.GetProfileItemsEx(_config.SubIndexId, _serverFilter);
+            var lstSelecteds =await profVm?.GetProfileItems(false);
+            if (lstSelecteds == null)
+            {
+                return;
+            }
+            //ClearTestResult();
+            _ = new SpeedtestService(_config, lstSelecteds, actionType, profVm.UpdateSpeedtestHandler);
+        }
+        /// <summary>
+        /// test Proxy speed by index 
+        /// </summary>
+        /// <param name="actionType"></param>
+        /// <param name="Prxindex"></param>
+        /// <returns></returns>
+        public async Task ServerSpeedtest(ESpeedActionType actionType,string Prxindex)
+        {
+            var profVm = Locator.Current.GetService<ProfilesViewModel>();
+            var item = await AppHandler.Instance.GetProfileItem(Prxindex);
+            var lstSelecteds = await profVm?.GetProfileItems(false);
+            if (lstSelecteds == null)
+            {
+                return;
+            }
+            //ClearTestResult();
 
+            _ = new SpeedtestService(_config, lstSelecteds, actionType, profVm.UpdateSpeedtestHandler);
+        }
         public async Task AddServerViaClipboardAsync(string? clipboardData)
         {
             if (clipboardData == null)

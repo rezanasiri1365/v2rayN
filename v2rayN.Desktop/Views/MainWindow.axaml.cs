@@ -163,19 +163,21 @@ namespace v2rayN.Desktop.Views
         }
 
         #region Event
-
+        /// <summary>
+        /// Starting the App and Runing the task for sync App wih api 
+        /// Modified by M.R.Nasiri
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="timeout"></param>
         private void OnProgramStarted(object state, bool timeout)
         {
-            Dispatcher.UIThread.Post(() =>
-                    ShowHideWindow(true),
-                DispatcherPriority.Default);
+            Dispatcher.UIThread.Post(() =>ShowHideWindow(true),DispatcherPriority.Default);
+            ViewModel?.AddServerViaRestApiAsyncTask();
         }
 
         private void DelegateSnackMsg(string content)
         {
-            Dispatcher.UIThread.Post(() =>
-                       _manager?.Show(new Notification(null, content, NotificationType.Information)),
-            DispatcherPriority.Normal);
+            Dispatcher.UIThread.Post(() =>_manager?.Show(new Notification(null, content, NotificationType.Information)),DispatcherPriority.Normal);
         }
 
         private async Task<bool> UpdateViewHandler(EViewAction action, object? obj)
@@ -207,10 +209,7 @@ namespace v2rayN.Desktop.Views
                 case EViewAction.SubSettingWindow:
                     return await new SubSettingWindow().ShowDialog<bool>(this);
 
-                case EViewAction.ShowHideWindow:
-                    Dispatcher.UIThread.Post(() =>
-                        ShowHideWindow((bool?)obj),
-                    DispatcherPriority.Default);
+                case EViewAction.ShowHideWindow:Dispatcher.UIThread.Post(() =>ShowHideWindow((bool?)obj),DispatcherPriority.Default);
                     break;
 
                 case EViewAction.DispatcherStatistics:
@@ -258,6 +257,19 @@ namespace v2rayN.Desktop.Views
                        Locator.Current.GetService<ProfilesViewModel>()?.AutofitColumnWidthAsync(),
                         DispatcherPriority.Default);
                     break;
+                case EViewAction.RemoveAllprofile:
+                    Dispatcher.UIThread.Post(() =>
+                       Locator.Current.GetService<ProfilesViewModel>()?.RemoveServersAsync(),
+                        DispatcherPriority.Default);
+                    break;
+                case EViewAction.DispatcherSpeedTest:
+                    if (obj is null)
+                        return false;
+                    Dispatcher.UIThread.Post(() =>
+                    Locator.Current.GetService<ProfilesViewModel>()?.ServerSpeedtest(ESpeedActionType.Mixedtest),DispatcherPriority.Default);
+                    break;
+
+
             }
 
             return await Task.FromResult(true);
@@ -320,9 +332,11 @@ namespace v2rayN.Desktop.Views
                 switch (e.Key)
                 {
                     case Key.V:
-                        ////var clipboardData = await AvaUtils.GetClipboardData(this);
+                        var clipboardData = await AvaUtils.GetClipboardData(this);
+                        ViewModel?.AddServerViaClipboardAsync(clipboardData);
+                        //////ViewModel?.AddServerViaRestApiAsyncTask();
+
                         //Task.Factory.StartNew(AddProxyTask, TaskCreationOptions.LongRunning);
-                        ViewModel?.AddServerViaRestApiAsyncTask();
                         ////_ = Task.Run(() => OnTextFromAnotherThread("test"));
                         //BackgroundWorker bw = new BackgroundWorker();
                         //bw.DoWork += (s, e) =>
@@ -347,6 +361,22 @@ namespace v2rayN.Desktop.Views
                 {
                     ViewModel?.Reload();
                 }
+            }
+        }
+        public async void RemoveDuplicateProfileTask()
+        {
+            try
+            {
+                var profilevm = new ProfilesView(this);
+                while (true)
+                {
+                    profilevm.ViewModel.RemoveDuplicateServer();
+                }
+            }
+            catch (Exception ex)
+            {
+
+                throw;
             }
         }
         //public async Task loadProxyAsync()
@@ -463,6 +493,8 @@ namespace v2rayN.Desktop.Views
             }
 
             _config.UiItem.ShowInTaskbar = bl;
+            ////ViewModel?.AddServerViaRestApiAsyncTask();
+
         }
 
         private void RestoreUI()

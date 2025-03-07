@@ -1,5 +1,7 @@
+using System;
 using System.Data;
 using System.Text.RegularExpressions;
+using ReactiveUI;
 
 namespace ServiceLib.Handler
 {
@@ -1130,6 +1132,12 @@ namespace ServiceLib.Handler
                 {
                     countServers++;
                     lstAdd.Add(profileItem);
+                    //var isExist = SQLiteHelper.Instance.TableAsync<ProfileItem>().Where(st=>st.IndexId==profileItem.IndexId && st.Path==profileItem.Path).FirstOrDefaultAsync();
+                    //if(isExist==null)
+                    //{
+                    //    countServers++;
+                    //    lstAdd.Add(profileItem);
+                    //}                         
                 }
             }
 
@@ -1140,6 +1148,104 @@ namespace ServiceLib.Handler
 
             await SaveConfig(config);
             return countServers;
+        }
+        /// <summary>
+        /// the function
+        /// Modified By M.R.Nasiri
+        /// </summary>
+        /// <param name="config"></param>
+        /// <param name="strData"></param>
+        /// <param name="subid"></param>
+        /// <param name="isSub"></param>
+        /// <returns></returns>
+        private static async Task<Tuple<int,bool>> AddBatchServersCommonUniq(Config config, string strData, string subid, bool isSub)
+        {
+            var tup= Tuple.Create(-1, false);
+            if (Utils.IsNullOrEmpty(strData))
+            {
+                return tup;
+            }
+
+            var subFilter = string.Empty;
+            //remove sub items
+            if (isSub && Utils.IsNotEmpty(subid))
+            {
+                await RemoveServerViaSubid(config, subid, isSub);
+                subFilter = (await AppHandler.Instance.GetSubItem(subid))?.Filter ?? "";
+            }
+
+            var countServers = 0;
+            List<ProfileItem> lstAdd = new();
+            var arrData = strData.Split(Environment.NewLine.ToCharArray()).Where(t => !t.IsNullOrEmpty());
+            if (isSub)
+            {
+                arrData = arrData.Distinct();
+            }
+            foreach (var str in arrData)
+            {
+                //maybe sub
+                if (!isSub && (str.StartsWith(Global.HttpsProtocol) || str.StartsWith(Global.HttpProtocol)))
+                {
+                    if (await AddSubItem(config, str) == 0)
+                    {
+                        countServers++;
+                    }
+                    continue;
+                }
+                var profileItem = FmtHandler.ResolveConfig(str, out string msg);
+                if (profileItem is null)
+                {
+                    continue;
+                }
+
+                //exist sub items //filter
+                if (isSub && Utils.IsNotEmpty(subid) && Utils.IsNotEmpty(subFilter))
+                {
+                    if (!Regex.IsMatch(profileItem.Remarks, subFilter))
+                    {
+                        continue;
+                    }
+                }
+                profileItem.Subid = subid;
+                profileItem.IsSub = isSub;
+
+                var addStatus = profileItem.ConfigType switch
+                {
+                    EConfigType.VMess => await AddVMessServer(config, profileItem, false),
+                    EConfigType.Shadowsocks => await AddShadowsocksServer(config, profileItem, false),
+                    EConfigType.SOCKS => await AddSocksServer(config, profileItem, false),
+                    EConfigType.Trojan => await AddTrojanServer(config, profileItem, false),
+                    EConfigType.VLESS => await AddVlessServer(config, profileItem, false),
+                    EConfigType.Hysteria2 => await AddHysteria2Server(config, profileItem, false),
+                    EConfigType.TUIC => await AddTuicServer(config, profileItem, false),
+                    EConfigType.WireGuard => await AddWireguardServer(config, profileItem, false),
+                    _ => -1,
+                };
+
+                if (addStatus == 0)
+                {
+                    ////countServers++;
+                    ////lstAdd.Add(profileItem);
+                    
+                    var isExist = await SQLiteHelper.Instance.TableAsync<ProfileItem>().Where(st =>  st.Address == profileItem.Address && st.Id== profileItem.Id).FirstOrDefaultAsync();
+                    if (isExist == null)
+                    {
+                        countServers++;
+                        lstAdd.Add(profileItem);
+                        tup = Tuple.Create(countServers, false);
+                    }
+                    else
+                        tup = Tuple.Create(countServers, true);
+                }
+            }
+
+            if (lstAdd.Count > 0)
+            {
+                await SQLiteHelper.Instance.InsertAllAsync(lstAdd);
+            }
+
+            await SaveConfig(config);
+            return tup;
         }
 
         private static async Task<int> AddBatchServers4Custom(Config config, string strData, string subid, bool isSub)
@@ -1274,6 +1380,7 @@ namespace ServiceLib.Handler
 
         public static async Task<int> AddBatchServers(Config config, string strData, string subid, bool isSub)
         {
+            Tuple<int, bool> TplCounter=Tuple.Create(-1,false);
             if (Utils.IsNullOrEmpty(strData))
             {
                 return -1;
@@ -1289,24 +1396,31 @@ namespace ServiceLib.Handler
             var counter = 0;
             if (Utils.IsBase64String(strData))
             {
-                counter = await AddBatchServersCommon(config, Utils.Base64Decode(strData), subid, isSub);
+                ////counter = await AddBatchServersCommon(config, Utils.Base64Decode(strData), subid, isSub);
+                TplCounter = await AddBatchServersCommonUniq(config, Utils.Base64Decode(strData), subid, isSub);
+                counter = TplCounter.Item1;
             }
-            if (counter < 1)
+            if (counter < 1 & !TplCounter.Item2)
             {
-                counter = await AddBatchServersCommon(config, strData, subid, isSub);
+                ////counter = await AddBatchServersCommon(config, strData, subid, isSub);
+                TplCounter = await AddBatchServersCommonUniq(config, strData, subid, isSub);
+                counter = TplCounter.Item1;
             }
-            if (counter < 1)
+            if (counter < 1 & !TplCounter.Item2)
             {
-                counter = await AddBatchServersCommon(config, Utils.Base64Decode(strData), subid, isSub);
+                ////counter = await AddBatchServersCommon(config, Utils.Base64Decode(strData), subid, isSub);
+                TplCounter = await AddBatchServersCommonUniq(config, Utils.Base64Decode(strData), subid, isSub);
+                
+                counter = TplCounter.Item1;
             }
 
-            if (counter < 1)
+            if (counter < 1 & !TplCounter.Item2)
             {
                 counter = await AddBatchServers4SsSIP008(config, strData, subid, isSub);
             }
 
             //maybe other sub
-            if (counter < 1)
+            if (counter < 1 & !TplCounter.Item2)
             {
                 counter = await AddBatchServers4Custom(config, strData, subid, isSub);
             }
